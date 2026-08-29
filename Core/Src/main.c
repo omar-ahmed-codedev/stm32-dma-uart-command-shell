@@ -1,17 +1,25 @@
-/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Main program body
+  * @brief          : UART command shell using DMA, between STM32F401RE and St-Link virtual COM port.
+  * 				  Button Input.
+  * @author			: Omar Ahmed
   ******************************************************************************
-  * @attention
+  * @details
+  * An interactive command shell giving users control over the on-board LED (LD2, PA5)
+  * blink rate (ms) and brightness (PWM)) independently.
+  * TIM2_CH1 drives the PWM for brightness, and TIM3 sets the blink interval in milliseconds.
+  * In addition, it creates feedback responses and status messages.
   *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
+  * Communication is handled through DMA1 stream 6 for TX and stream 5 for RX,
+  * which operates in circular mode, storing the received messages in a ring buffer.
+  * The end of each message is detected by the USART IDLE interrupt.
   *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
+  * Commands: --
+  *
+  *
+  * Target: NUCLEO-F401RE (STM32F401RE, ARM Cortex-M4, 84 MHz)
+  *
   *
   ******************************************************************************
   */
@@ -21,7 +29,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>		// Byte and string manipulation
+#include <stdio.h>		// Declares vsnprintf, used in shell_printf
+#include <stdarg.h>		// Standard arguments, machinery for variadic functions.
+#include <stdlib.h>		// Standard library.
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +42,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define RX_BUFFER_SIZE	64
+#define TX_BUFFER_SIZE	64
+#define MSG_LEN_MAX	64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,6 +60,17 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
+// UART receive
+extern volatile uint8_t rx_ready;
+static uint8_t rx_buffer[RX_BUFFER_SIZE];
+
+static volatile uint16_t rx_tail = 0;
+uint16_t rx_head = 0;
+
+static char rx_msg[MSG_LEN_MAX] = 0;
+static uint16_t rx_msg_len = 0;
+
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -58,12 +82,60 @@ static void MX_DMA_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void UART_Recieve(void);
+static void shell_poll(void);
+void static shell_execute(char command);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/**
+  * @brief  Intialize recieve on the UART through DMA1. Always running.
+  */
+
+static void UART_Recieve_Start(void){
+	HAL_UART_Receive_DMA(&huart, rx_buf, RX_BUFFER_SIZE);
+}
+
+
+static void shell_poll(void){
+
+	// Buffer size - NDTR, to get where the recieve msg stopped.
+	// NDTR is updated continously.
+	rx_head = RX_BUFFER_SIZE - (uint16_t)__HAL_DMA_GET_COUNTER(huart2.hdmarx);
+
+	while (rx_tail != rx_head){			// tail = head when a msg is complete
+
+		char c = rx_buffer[rx_tail];
+		rx_tail = (rx_tail+1) % RX_BUFFER_SIZE; 	// Increment tail. Wrap at buffer end.
+
+		if (c == '\r' || C == '\n'){		// When a msg is done
+			if (rx_msg_len>0){
+				rx_msg[rx_msg_len]= '\0';
+				shell_execute(rx_msg);
+				rx_msg_len = 0;
+			}
+		}
+		else if (rx_msg_len < (MSG_LEN_MAX - 1)){
+			rx_msg[rx_msg_len] = c;
+			rx_msg_len++;
+		}
+		else{
+			rx_msg_len = 0;	// Clear the rest of the line in overflow msgs
+		}
+	}
+}
+
+
+void static shell_execute(char msg){
+
+
+
+}
+
 
 /* USER CODE END 0 */
 
@@ -140,7 +212,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLN = 84;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)Q
   {
     Error_Handler();
   }
@@ -182,7 +254,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 839;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4999;
+  htim2.Init.Period = 99;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)

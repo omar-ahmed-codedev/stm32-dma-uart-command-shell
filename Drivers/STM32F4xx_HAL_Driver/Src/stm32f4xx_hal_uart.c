@@ -3318,7 +3318,6 @@ HAL_StatusTypeDef UART_Start_Receive_DMA(UART_HandleTypeDef *huart, uint8_t *pDa
   huart->hdmarx->XferAbortCallback = NULL;
 
   /* Enable the DMA stream */
-  tmp = (uint32_t *)&pData;
   if (HAL_DMA_Start_IT(huart->hdmarx, (uint32_t)&huart->Instance->DR, *(uint32_t *)tmp, Size) != HAL_OK)
   {
     /* Set error code to DMA */
