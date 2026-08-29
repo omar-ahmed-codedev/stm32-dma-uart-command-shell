@@ -97,7 +97,9 @@ void static shell_execute(char command);
   */
 
 static void UART_Recieve_Start(void){
-	HAL_UART_Receive_DMA(&huart, rx_buf, RX_BUFFER_SIZE);
+	rx_tail = 0;
+	rx_msg_len = 0;
+	HAL_UART_Receive_DMA(&huart, rx_buffer, RX_BUFFER_SIZE);
 }
 
 
@@ -112,7 +114,7 @@ static void shell_poll(void){
 		char c = rx_buffer[rx_tail];
 		rx_tail = (rx_tail+1) % RX_BUFFER_SIZE; 	// Increment tail. Wrap at buffer end.
 
-		if (c == '\r' || C == '\n'){		// When a msg is done
+		if (c == '\r' || c == '\n'){		// When a msg is done
 			if (rx_msg_len>0){
 				rx_msg[rx_msg_len]= '\0';
 				shell_execute(rx_msg);
@@ -131,9 +133,15 @@ static void shell_poll(void){
 
 
 void static shell_execute(char msg){
+	uint32_t value;
 
-
-
+	if (strcmp(cmd, "help") == 0){
+		shell_printf("\r\n"
+	                 "  pwm <0-100>    brightness, %% duty cycle\r\n"
+	                 "  blink <ms>     blink half-period, 0 = steady\r\n"
+	                 "  status         current settings\r\n"
+	                 "  help           this text\r\n");
+	  }
 }
 
 
