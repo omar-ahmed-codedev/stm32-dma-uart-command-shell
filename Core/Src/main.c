@@ -45,6 +45,9 @@
 #define RX_BUFFER_SIZE	64
 #define TX_BUFFER_SIZE	64
 #define MSG_LEN_MAX	64
+
+#define BLINK_MS_MAX	6553		// TIM3 ARR is 16-bit --> 65535 // 1 ARR
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,6 +63,10 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
+// LED settings
+uint32_t duty_cycle = 0;
+uint32_t blink_ms = 0;
+
 // UART receive
 extern volatile uint8_t rx_ready;
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
@@ -69,6 +76,8 @@ uint16_t rx_head = 0;
 
 static char rx_msg[MSG_LEN_MAX] = 0;
 static uint16_t rx_msg_len = 0;
+
+
 
 
 /* USER CODE BEGIN PV */
@@ -82,9 +91,13 @@ static void MX_DMA_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
-static void UART_Recieve(void);
+static void UART_Recieve_Start(void);
 static void shell_poll(void);
-void static shell_execute(char command);
+static void shell_execute(char *msg);
+static void shell_printf(char *msg_rpint, ...);		// ... is ellipsis. variadic function --> accepts any number of additional arguments
+static int parse_int(char *str, uint32_t *val);
+static void led_set_pwm(void);
+static void led_set_blink(uint16_t ms);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -99,10 +112,12 @@ void static shell_execute(char command);
 static void UART_Recieve_Start(void){
 	rx_tail = 0;
 	rx_msg_len = 0;
-	HAL_UART_Receive_DMA(&huart, rx_buffer, RX_BUFFER_SIZE);
+	HAL_UART_Receive_DMA(&huart2, rx_buffer, RX_BUFFER_SIZE);
 }
 
-
+/**
+  * @brief  Pol what is received in rx_buffer and hand it to shell_execute.
+  */
 static void shell_poll(void){
 
 	// Buffer size - NDTR, to get where the recieve msg stopped.
@@ -131,19 +146,87 @@ static void shell_poll(void){
 	}
 }
 
+/**
+  * @brief  Chech content of received msg, act on it, and print a response.
+  */
+void static shell_execute(char *msg){
 
-void static shell_execute(char msg){
-	uint32_t value;
+	uint32_t value = 0;		// stroul return unsigned long, which is 32 bits on ARM32 M4
 
-	if (strcmp(cmd, "help") == 0){
+	// Check msg
+	// help
+	if(strncmp(msg, "help",4)==0){
 		shell_printf("\r\n"
-	                 "  pwm <0-100>    brightness, %% duty cycle\r\n"
-	                 "  blink <ms>     blink half-period, 0 = steady\r\n"
-	                 "  status         current settings\r\n"
-	                 "  help           this text\r\n");
-	  }
+					"pwm<0-100>		brightness %% duty cycle \r\n"
+					"blink <ms>		blink half-period, 0 = steady on\r\n"
+					"status			current settings\r\n"
+					"help			this text\r\n");
+	} // pmw <0-100>
+	else if (strncmp(msg, "pmw", 3)==0){
+		if(!parse_int(msg+3, &value) || value > 100){
+			shell_printf("Error: invalid pwm value, expects <0-100>!");
+		}
+		else if(value<=100){
+			duty_cycle = value;
+			led_set_pwm();
+			shell_printf("Brightness set to %u%%!\r\n", duty_cycle);
+		}
+
+	} // blink <0-100>
+	else if (strncmp(msg, "blink",5)==0){
+		if (!parse_int(msg+5, &value) || value>100){
+			shell_printf("Error: invalid brightness, expects 0-%u\r\n!", BLINK_MS_MAX);
+		}
+		else if(value == 0){
+			led_set_blink(0);
+			shell_printf("Blinking off!\r\n");
+
+		}
+		else{
+			led_set_blink((uint16_t) value);
+			shell_printf("Blink half-period set to %u!\r\n", value);
+		}
+	} // status
+	else if (strncmp(msg, "status", 6)){
+		shell_printf("Brightness: %u%%\r\n", duty_cycle);
+		shell_printf("Blink half-period: %u%%", blink_ms);
+
+	}
+	else{
+		shell_printf("Error: unknown command!");
+	}
 }
 
+/**
+  * @brief  Parse a decimal value from a string and reject any trailing junk
+  * @retval int, 1 on success, 0 on failure.
+  */
+static int parse_int(char *str, uint32_t *val){
+
+	uint32_t *out;
+	char *end
+
+	while (str == ''){
+		str++;
+	}
+	if(str<0 || str>9){
+		return 0;
+	}
+
+	v=strtoul(str, &end, 10);
+
+	while (*end == ''){
+		end++;
+	}
+
+	if (end!='\0'){
+		return 0;
+
+	}
+
+	*out = v;
+	return 1;
+}
 
 /* USER CODE END 0 */
 
@@ -220,7 +303,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLN = 84;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)Q
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
