@@ -264,8 +264,8 @@ void TIM3_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
-	if(__HAL_UART_GET_FLAG(&huart, UART_FLAG_IDLE)){
-	  __HAL_UART_CLEAR_IDLEFLAG(&huart);
+	if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE)){
+	  __HAL_UART_CLEAR_IDLEFLAG(&huart2);
 	  rx_ready = 1;
 	}
 

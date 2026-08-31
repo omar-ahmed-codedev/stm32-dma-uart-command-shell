@@ -45,7 +45,6 @@
 #define RX_BUFFER_SIZE	64
 #define TX_BUFFER_SIZE	64
 #define MSG_LEN_MAX	64
-
 #define BLINK_MS_MAX	6553		// TIM3 ARR is 16-bit --> 65535 // 1 ARR
 
 /* USER CODE END PD */
@@ -64,18 +63,23 @@ DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
 // LED settings
-uint32_t duty_cycle = 0;
-uint32_t blink_ms = 0;
+
 
 // UART receive
 extern volatile uint8_t rx_ready;
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
+static char tx_buffer[TX_BUFFER_SIZE];
 
 static volatile uint16_t rx_tail = 0;
-uint16_t rx_head = 0;
+static volatile uint16_t rx_head = 0;
 
-static char rx_msg[MSG_LEN_MAX] = 0;
+static char rx_msg[MSG_LEN_MAX];
 static uint16_t rx_msg_len = 0;
+
+// LED state
+static volatile uint8_t blink_on = 0;
+static volatile uint16_t blink_ms = 0;	// Size needs to match resigters of TIM3
+static volatile uint32_t duty_cycle = 0;
 
 
 
@@ -94,7 +98,7 @@ static void MX_TIM3_Init(void);
 static void UART_Recieve_Start(void);
 static void shell_poll(void);
 static void shell_execute(char *msg);
-static void shell_printf(char *msg_rpint, ...);		// ... is ellipsis. variadic function --> accepts any number of additional arguments
+static void shell_printf(const char *msg, ...);		// ... is ellipsis. variadic function --> accepts any number of additional arguments
 static int parse_int(char *str, uint32_t *val);
 static void led_set_pwm(void);
 static void led_set_blink(uint16_t ms);
@@ -203,30 +207,131 @@ void static shell_execute(char *msg){
   */
 static int parse_int(char *str, uint32_t *val){
 
-	uint32_t *out;
-	char *end
+	uint32_t v;		// uint32_t is same size as unsigned long on Cortex M4
+	char *end;
 
-	while (str == ''){
+	while (*str == ' '){
 		str++;
 	}
-	if(str<0 || str>9){
+	if(*str<0 || *str>9){
 		return 0;
 	}
 
 	v=strtoul(str, &end, 10);
 
-	while (*end == ''){
+	while (*end == ' '){
 		end++;
 	}
 
-	if (end!='\0'){
+	if (*end!='\0'){
 		return 0;
 
 	}
 
-	*out = v;
+	*val = v;
 	return 1;
 }
+
+
+/**
+  * @brief  Formats a message and hand it to the TX DMA.
+  */
+
+static void shell_printf(const char *str, ...){
+
+    va_list args;   // A type for handling the arguments represented by ..., it iterates over the additional arguments
+    int len;
+
+    while (huart2.gState != HAL_UART_STATE_READY){
+        // Wait until UART is ready for another operation after the latest HAL_UART_Transmit_DMA
+        // Acceptable because it is only called in the main loop
+    }
+
+    // Intialize args --> args-> first agrument after str (the last named argument of the function)
+    va_start(args, str);        // Gives vsnprint access to the arguments supplied through ...
+
+    // Formulate the arguments into a string buffer with a max.
+    len = vsnprintf(tx_buffer, TX_BUFFER_SIZE, str, args);        // Difference between snprintf is that it accepts vardiac (accepts additional arguments)
+                                                               // Len recieves the bytes written or would have been written if the buffer is not long enough in the buffer. (minus 1(\0))
+    va_end(args);      // Finished using va_start
+    if (len > 0){
+        if(len> (int) TX_BUFFER_SIZE){
+            len = (int) TX_BUFFER_SIZE;
+        }
+        // Starts the transmission and returns before all the bytes have physically been transmitted.
+        HAL_UART_Transmit_DMA(&huart2, (uint8_t*)tx_buffer, (uint16_t) len);
+    }
+
+}
+
+/**
+  * @brief  Updates the PWM duty cycle in the capture compare register
+  */
+static void led_set_pwm(void){
+    uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim2);
+    uint32_t crr = 0;
+
+    if(blink_on){
+        crr = ((arr+1)*(uint32_t)duty_cycle/100);
+    }
+
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, crr);
+
+}
+
+
+/**
+  * @brief  Updates the blink half-period.
+  */
+static void led_set_blink(uint16_t ms){
+
+    blink_ms = ms;  // Take a copy of current blink half-period
+    if(ms==0){
+        HAL_TIM_Base_Stop_IT(&htim3);    // Stop TIM3 interrupt
+        blink_on = 1;           // Must be set to 1 in case TIM3 was stopped during the off phase, leaving crr 0 in led_set_pwm forever.
+    }
+    else{
+        __HAL_TIM_SET_AUTORELOAD(&htim3, (uint32_t) ms*10 - 1);   // Update auto-reload. With 100KHz, ARR = ms*10 -10
+        __HAL_TIM_SET_COUNTER(&htim3,0);    // Reset counter
+        blink_on = 1;
+        HAL_TIM_Base_Start_IT(&htim3);   // Enable interrupt and start counter
+    }
+    led_set_pwm();
+
+}
+
+// TIM3 toggles blink_on to control whether CCR get the latest value or a 0 through its interrupt. This approach was chosen over the also-valid alternative TIM3 directly controlling PA5(LED),
+// because the pin would have to be reconfigured between alternate fucntion and normal output during runtime.
+
+
+/**
+  * @brief  TIM3 update:toggles blink_on to control whether CCR get the latest value or a 0 through its interrupt.
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+
+    if(htim->Instance == TIM3){
+    	blink_on ^= 1;
+    	led_set_pwm();
+    }
+}
+
+/**
+  * @brief  Recover from receive errors. Restart the UART
+  */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart){
+
+    if(huart->Instance == USART2){
+        __HAL_UART_CLEAR_OREFLAG(huart);    // A new byte finished arriving in the shift register before the previous one was read out of DR
+        __HAL_UART_CLEAR_NEFLAG(huart);     // If the three samples in the middle of sampling disagree, the bit was noisy
+        __HAL_UART_CLEAR_FEFLAG(huart);     // Frame error: stop bit was where it should not be
+
+        if (huart->RxState != HAL_UART_STATE_BUSY_RX)
+        {
+        UART_Recieve_Start();
+        }
+    }
+}
+
 
 /* USER CODE END 0 */
 
@@ -264,7 +369,11 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  led_set_pwm();
 
+  UART_Recieve_Start();
+  shell_printf("\r\nSTM32F401RE shell ready. Type 'help'.\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */

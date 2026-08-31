@@ -1,0 +1,17 @@
+../Core/Src/main.c:116:13:UART_Recieve_Start	1
+../Core/Src/main.c:125:13:shell_poll	6
+../Core/Src/main.c:156:13:shell_execute	11
+../Core/Src/main.c:208:12:parse_int	5
+../Core/Src/main.c:240:13:shell_printf	4
+../Core/Src/main.c:270:13:led_set_pwm	2
+../Core/Src/main.c:286:13:led_set_blink	2
+../Core/Src/main.c:310:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:321:6:HAL_UART_ErrorCallback	3
+../Core/Src/main.c:342:5:main	1
+../Core/Src/main.c:394:6:SystemClock_Config	3
+../Core/Src/main.c:440:13:MX_TIM2_Init	6
+../Core/Src/main.c:499:13:MX_TIM3_Init	4
+../Core/Src/main.c:544:13:MX_USART2_UART_Init	2
+../Core/Src/main.c:575:13:MX_DMA_Init	1
+../Core/Src/main.c:596:13:MX_GPIO_Init	1
+../Core/Src/main.c:619:6:Error_Handler	1
