@@ -167,7 +167,7 @@ void static shell_execute(char *msg){
 		else if(value<=100){
 			duty_cycle = value;
 			led_set_pwm();
-			shell_printf("Brightness set to %u %%!\r\n\r\n", duty_cycle);
+			shell_printf("Brightness set to %u%%!\r\n\r\n", duty_cycle);
 		}
 
 	} // blink <0-100>
@@ -187,7 +187,7 @@ void static shell_execute(char *msg){
 	} // status
 	else if (strncmp(msg, "status", 6)==0){
 		shell_printf("Brightness: %u%%\r\n", duty_cycle);
-		shell_printf("Blink half-period: %u%%", blink_ms);
+		shell_printf("Blink half-period: %u ms", blink_ms);
 
 	}
 	else{

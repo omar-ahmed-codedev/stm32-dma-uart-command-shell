@@ -27,25 +27,25 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   ALLOC
  11 .ARM.attributes 00000030  00000000  00000000  00007064  2**0
                   CONTENTS, READONLY
- 12 .debug_info   0000d306  00000000  00000000  00007094  2**0
+ 12 .debug_info   0000d303  00000000  00000000  00007094  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 13 .debug_abbrev 00001dfd  00000000  00000000  0001439a  2**0
+ 13 .debug_abbrev 00001df9  00000000  00000000  00014397  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 14 .debug_aranges 00000cb8  00000000  00000000  00016198  2**3
+ 14 .debug_aranges 00000cb8  00000000  00000000  00016190  2**3
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 15 .debug_rnglists 000009f7  00000000  00000000  00016e50  2**0
+ 15 .debug_rnglists 000009f7  00000000  00000000  00016e48  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 16 .debug_macro  0001655b  00000000  00000000  00017847  2**0
+ 16 .debug_macro  0001655b  00000000  00000000  0001783f  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_line   0000e0ff  00000000  00000000  0002dda2  2**0
+ 17 .debug_line   0000e0ff  00000000  00000000  0002dd9a  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    0008dc20  00000000  00000000  0003bea1  2**0
+ 18 .debug_str    0008dc20  00000000  00000000  0003be99  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  000c9ac1  2**0
+ 19 .comment      00000043  00000000  00000000  000c9ab9  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  000038f8  00000000  00000000  000c9b04  2**2
+ 20 .debug_frame  000038f8  00000000  00000000  000c9afc  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 00000067  00000000  00000000  000cd3fc  2**0
+ 21 .debug_line_str 00000067  00000000  00000000  000cd3f4  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -628,7 +628,7 @@ void static shell_execute(char *msg){
  80006de:	6013      	str	r3, [r2, #0]
 			led_set_pwm();
  80006e0:	f000 f8de 	bl	80008a0 <led_set_pwm>
-			shell_printf("Brightness set to %u %%!\r\n\r\n", duty_cycle);
+			shell_printf("Brightness set to %u%%!\r\n\r\n", duty_cycle);
  80006e4:	4b2f      	ldr	r3, [pc, #188]	@ (80007a4 <shell_execute+0x128>)
  80006e6:	681b      	ldr	r3, [r3, #0]
  80006e8:	4619      	mov	r1, r3
@@ -701,7 +701,7 @@ void static shell_execute(char *msg){
  800076c:	4619      	mov	r1, r3
  800076e:	4814      	ldr	r0, [pc, #80]	@ (80007c0 <shell_execute+0x144>)
  8000770:	f000 f864 	bl	800083c <shell_printf>
-		shell_printf("Blink half-period: %u%%", blink_ms);
+		shell_printf("Blink half-period: %u ms", blink_ms);
  8000774:	4b13      	ldr	r3, [pc, #76]	@ (80007c4 <shell_execute+0x148>)
  8000776:	881b      	ldrh	r3, [r3, #0]
  8000778:	b29b      	uxth	r3, r3
@@ -725,14 +725,14 @@ void static shell_execute(char *msg){
  80007a0:	08005940 	.word	0x08005940
  80007a4:	20000004 	.word	0x20000004
  80007a8:	08005970 	.word	0x08005970
- 80007ac:	08005990 	.word	0x08005990
- 80007b0:	08005998 	.word	0x08005998
- 80007b4:	080059c4 	.word	0x080059c4
- 80007b8:	080059d8 	.word	0x080059d8
- 80007bc:	080059fc 	.word	0x080059fc
- 80007c0:	08005a04 	.word	0x08005a04
+ 80007ac:	0800598c 	.word	0x0800598c
+ 80007b0:	08005994 	.word	0x08005994
+ 80007b4:	080059c0 	.word	0x080059c0
+ 80007b8:	080059d4 	.word	0x080059d4
+ 80007bc:	080059f8 	.word	0x080059f8
+ 80007c0:	08005a00 	.word	0x08005a00
  80007c4:	2000039e 	.word	0x2000039e
- 80007c8:	08005a18 	.word	0x08005a18
+ 80007c8:	08005a14 	.word	0x08005a14
  80007cc:	08005a30 	.word	0x08005a30
 
 080007d0 <parse_int>:
