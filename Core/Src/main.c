@@ -1,3 +1,4 @@
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -15,8 +16,11 @@
   * which operates in circular mode, storing the received messages in a ring buffer.
   * The end of each message is detected by the USART IDLE interrupt.
   *
-  * Commands: --
-  *
+  * Commands:
+  * - help
+  * - pwm <0-100>
+  * - blink <ms>
+  * - status
   *
   * Target: NUCLEO-F401RE (STM32F401RE, ARM Cortex-M4, 84 MHz)
   *
@@ -43,7 +47,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define RX_BUFFER_SIZE	64
-#define TX_BUFFER_SIZE	64
+#define TX_BUFFER_SIZE	256
 #define MSG_LEN_MAX	64
 #define BLINK_MS_MAX	6553		// TIM3 ARR is 16-bit --> 65535 // 1 ARR
 
@@ -62,9 +66,7 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
-// LED settings
-
-
+/* USER CODE BEGIN PV */
 // UART receive
 extern volatile uint8_t rx_ready;
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
@@ -77,18 +79,20 @@ static char rx_msg[MSG_LEN_MAX];
 static uint16_t rx_msg_len = 0;
 
 // LED state
-static volatile uint8_t blink_on = 0;
+static volatile uint8_t blink_on = 1;
 static volatile uint16_t blink_ms = 0;	// Size needs to match resigters of TIM3
-static volatile uint32_t duty_cycle = 0;
-
-
-
-
-/* USER CODE BEGIN PV */
+static volatile uint32_t duty_cycle = 50;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_USART2_UART_Init(void);
+static void MX_TIM3_Init(void);
+/* USER CODE BEGIN PFP */
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
@@ -103,27 +107,17 @@ static int parse_int(char *str, uint32_t *val);
 static void led_set_pwm(void);
 static void led_set_blink(uint16_t ms);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-/**
-  * @brief  Intialize recieve on the UART through DMA1. Always running.
-  */
 
-static void UART_Recieve_Start(void){
-	rx_tail = 0;
-	rx_msg_len = 0;
-	HAL_UART_Receive_DMA(&huart2, rx_buffer, RX_BUFFER_SIZE);
-}
 
 /**
   * @brief  Pol what is received in rx_buffer and hand it to shell_execute.
   */
 static void shell_poll(void){
-
 	// Buffer size - NDTR, to get where the recieve msg stopped.
 	// NDTR is updated continously.
 	rx_head = RX_BUFFER_SIZE - (uint16_t)__HAL_DMA_GET_COUNTER(huart2.hdmarx);
@@ -161,43 +155,43 @@ void static shell_execute(char *msg){
 	// help
 	if(strncmp(msg, "help",4)==0){
 		shell_printf("\r\n"
-					"pwm<0-100>		brightness %% duty cycle \r\n"
+					"pwm <0-100>		brightness %% duty cycle \r\n"
 					"blink <ms>		blink half-period, 0 = steady on\r\n"
 					"status			current settings\r\n"
-					"help			this text\r\n");
+					"help			this text\r\n\r\n");
 	} // pmw <0-100>
-	else if (strncmp(msg, "pmw", 3)==0){
+	else if (strncmp(msg, "pwm", 3)==0){
 		if(!parse_int(msg+3, &value) || value > 100){
-			shell_printf("Error: invalid pwm value, expects <0-100>!");
+			shell_printf("Error: invalid pwm value, expects <0-100>!\r\n\r\n");
 		}
 		else if(value<=100){
 			duty_cycle = value;
 			led_set_pwm();
-			shell_printf("Brightness set to %u%%!\r\n", duty_cycle);
+			shell_printf("Brightness set to %u %%!\r\n\r\n", duty_cycle);
 		}
 
 	} // blink <0-100>
 	else if (strncmp(msg, "blink",5)==0){
-		if (!parse_int(msg+5, &value) || value>100){
-			shell_printf("Error: invalid brightness, expects 0-%u\r\n!", BLINK_MS_MAX);
+		if (!parse_int(msg+5, &value) || value>	6553){		// TIM3 ARR is 16-bit --> 65535 // 1 ARR)
+			shell_printf("Error: invalid brightness, expects 0-%u\r\n\r\n", BLINK_MS_MAX);
 		}
 		else if(value == 0){
 			led_set_blink(0);
-			shell_printf("Blinking off!\r\n");
+			shell_printf("Blinking off!\r\n\r\n");
 
 		}
 		else{
 			led_set_blink((uint16_t) value);
-			shell_printf("Blink half-period set to %u!\r\n", value);
+			shell_printf("Blink half-period set to %u ms!\r\n\r\n", value);
 		}
 	} // status
-	else if (strncmp(msg, "status", 6)){
+	else if (strncmp(msg, "status", 6)==0){
 		shell_printf("Brightness: %u%%\r\n", duty_cycle);
 		shell_printf("Blink half-period: %u%%", blink_ms);
 
 	}
 	else{
-		shell_printf("Error: unknown command!");
+		shell_printf("Error: unknown command!\r\n\r\n");
 	}
 }
 
@@ -213,7 +207,7 @@ static int parse_int(char *str, uint32_t *val){
 	while (*str == ' '){
 		str++;
 	}
-	if(*str<0 || *str>9){
+	if(*str<'0' || *str>'9'){
 		return 0;
 	}
 
@@ -332,6 +326,28 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart){
     }
 }
 
+/**
+  * @brief  UART nterrupt call back function
+  * @retval int
+  */
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size){  //size represents number of bytes received when the callback is called
+
+	if(huart->Instance == USART2){
+	rx_ready = 1;
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, rx_buffer, RX_BUFFER_SIZE); // Call interrupt again to continue receiving data since it was disabled after calling the callback
+	}
+}
+
+
+/**
+  * @brief  Intialize recieve on the UART through DMA1. Always running.
+  */
+
+static void UART_Recieve_Start(void){
+	rx_tail = 0;
+	rx_msg_len = 0;
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, rx_buffer, RX_BUFFER_SIZE); // Interrupt fires when idel or when data is more than size
+}
 
 /* USER CODE END 0 */
 
@@ -369,11 +385,12 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  led_set_blink(500);
+  UART_Recieve_Start();
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   led_set_pwm();
 
-  UART_Recieve_Start();
-  shell_printf("\r\nSTM32F401RE shell ready. Type 'help'.\r\n");
+  shell_printf("\r\nSTM32F401RE shell ready. Type 'help'.\r\n\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -383,6 +400,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  if (rx_ready){
+	  		  rx_ready = 0;
+	  	      shell_poll();
+	  	    }
   }
   /* USER CODE END 3 */
 }
@@ -405,7 +426,7 @@ void SystemClock_Config(void)
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;

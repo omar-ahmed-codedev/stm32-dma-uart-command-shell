@@ -12,16 +12,21 @@ configurable at runtime from the shell and are controlled independently.
 
 ## Commands
 
-| Command | Effect |
-|---|---|
-| `help` | List available commands |
-| `pwm <0-100>` | LED brightness, as duty cycle percent |
-| `blink <ms>` | LED on/off interval |
-| `status` | Report current brightness and blink rate |
-| `uptime` | Seconds since reset |
+On reset, before any command:
+STM32F401RE shell ready. Type 'help'.
+```
+
+| Command | Effect | Response |
+|---|---|---|
+| `help` | List available commands | The command list |
+| `pwm <0-100>` | LED brightness, as duty cycle percent | `Brightness set to 50%!` |
+| `blink <ms>` | LED on/off half-period, `0` for steady | `Blink half-period set to 500!` or `Blinking off!` |
+| `status` | Report current settings | `Brightness: 50%, blink half-period: 500 ms` |
+
+
 
 Invalid commands, out-of-range values, and missing arguments each return a
-distinct error message.
+error message 'Error: unknown command!'.
 
 ## How receive works
 
@@ -57,6 +62,12 @@ in the `.ioc` file — open with standalone STM32CubeMX to regenerate if needed.
 | PA5 | LD2, alternate function AF1 → TIM2_CH1 |
 | TIM2 | PSC 839, ARR 99 → 1 kHz PWM on CH1; compare value maps to percent |
 | TIM3 | PSC 8399, ARR 4999 → 500 ms per phase; gates the PWM output on and off at the blink interval |
+
+## Demo
+
+UART command shell running:
+
+![UART shell demo](docs/uart_shell_demo.png)
 
 ## References
 
