@@ -13,6 +13,7 @@ configurable at runtime from the shell and are controlled independently.
 ## Commands
 
 On reset, before any command:
+```
 STM32F401RE shell ready. Type 'help'.
 ```
 
